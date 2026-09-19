@@ -1,0 +1,138 @@
+version: '3.8'
+
+services:
+  # Database Connection Pooling
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: cinestream-pgbouncer
+    environment:
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: webtruyenphim
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 200
+      DEFAULT_POOL_SIZE: 50
+      RESERVE_POOL_SIZE: 10
+      MAX_DB_CONNECTIONS: 80
+    ports:
+      - "5431:5432"
+    depends_on:
+      - postgres
+    networks:
+      - cinestream-network
+
+  # Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: cinestream-db
+    environment:
+      POSTGRES_DB: webtruyenphim
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - cinestream-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+
+  # Cache & Queue
+  redis:
+    image: redis:7-alpine
+    container_name: cinestream-redis
+    command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - cinestream-network
+    deploy:
+      resources:
+        limits:
+          memory: 2.5G
+
+  # API Service (3 instances for load balancing)
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: cinestream-api
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@pgbouncer:5432/webtruyenphim?schema=public&connection_limit=20
+      DIRECT_URL: postgresql://postgres:postgres@postgres:5432/webtruyenphim?schema=public
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+      CLUSTER_MODE: true
+    ports:
+      - "3000"
+    depends_on:
+      - pgbouncer
+      - redis
+    networks:
+      - cinestream-network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
+  # Worker Service
+  worker:
+    build:
+      context: .
+      dockerfile: api/worker/Dockerfile
+    container_name: cinestream-worker
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@pgbouncer:5432/webtruyenphim?schema=public&connection_limit=5
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+    depends_on:
+      - pgbouncer
+      - redis
+    volumes:
+      - ./media:/media
+    networks:
+      - cinestream-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+
+  # Frontend Service
+  frontend:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    container_name: cinestream-frontend
+    ports:
+      - "3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://api:3000
+    depends_on:
+      - api
+    networks:
+      - cinestream-network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
+networks:
+  cinestream-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

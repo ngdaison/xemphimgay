@@ -1,0 +1,586 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ContentType {
+  MOVIE
+  ANIME
+  VIDEO
+  STORY
+  MANGA
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  HIDDEN
+  SCHEDULED
+  ARCHIVED
+  DELETED
+}
+
+enum ReleaseStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  PAUSED
+  DROPPED
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  username      String    @unique
+  passwordHash  String
+  displayName   String?
+  avatarUrl     String?
+  isVerified    Boolean   @default(false)
+  roleId        String
+  role          Role      @relation(fields: [roleId], references: [id])
+  
+  sessions      Session[]
+  refreshTokens RefreshToken[]
+  passkeys      Passkey[]
+  loginEvents   LoginEvent[]
+  securityLogs  SecurityLog[]
+  auditLogs     AuditLog[]
+  
+  comments      Comment[]
+  ratings       Rating[]
+  likes         Like[]
+  favorites     Favorite[]
+  follows       Follow[]
+  watchHistory  WatchHistory[]
+  readHistory   ReadHistory[]
+  notifications Notification[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  @@index([roleId])
+  @@index([email])
+  @@index([username])
+}
+
+model Role {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  description String?
+  permissions RolePermission[]
+  users       User[]
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  description String?
+  roles       RolePermission[]
+  
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  userAgent String?
+  ipAddress String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  tokenHash String   @unique
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Passkey {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  credentialId  String   @unique
+  publicKey     Bytes
+  counter       BigInt
+  deviceType    String
+  backedUp      Boolean
+  transports    String[]
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+}
+
+model LoginEvent {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  ipAddress String?
+  userAgent String?
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model SecurityLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  event     String
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  resource  String
+  resourceId String?
+  oldValues Json?
+  newValues Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Content {
+  id            String        @id @default(uuid())
+  type          ContentType
+  title         String
+  originalTitle String?
+  otherTitles   String[]
+  slug          String        @unique
+  description   String?
+  longDescription String?
+  posterUrl     String?
+  backgroundUrl String?
+  thumbnailUrl  String?
+  trailerUrl    String?
+  releaseYear   Int?
+  countryId     String?
+  country       Country?      @relation(fields: [countryId], references: [id])
+  status        ContentStatus @default(DRAFT)
+  releaseStatus ReleaseStatus @default(UPCOMING)
+  ageRating     String?
+  
+  viewCount     Int           @default(0)
+  likeCount     Int           @default(0)
+  followCount   Int           @default(0)
+  ratingAvg     Float         @default(0)
+  ratingCount   Int           @default(0)
+  
+  seoTitle       String?
+  seoDescription String?
+  canonicalUrl   String?
+  ogImageUrl     String?
+  
+  publishedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+  
+  genres        ContentGenre[]
+  tags          ContentTag[]
+  people        ContentPerson[]
+  studios       ContentStudio[]
+  
+  movie         Movie?
+  anime         Anime?
+  video         Video?
+  story         Story?
+  manga         Manga?
+  
+  comments      Comment[]
+  ratings       Rating[]
+  likes         Like[]
+  favorites     Favorite[]
+  follows       Follow[]
+  views         View[]
+
+  @@index([slug])
+  @@index([type])
+  @@index([status])
+  @@index([viewCount])
+  @@index([ratingAvg])
+  @@index([publishedAt])
+}
+
+model Movie {
+  contentId   String  @id
+  content     Content @relation(fields: [contentId], references: [id])
+  duration    Int?    // in minutes
+  videoSourceId String?
+}
+
+model Anime {
+  contentId   String  @id
+  content     Content @relation(fields: [contentId], references: [id])
+  totalEpisodes Int?
+  currentEpisodes Int   @default(0)
+  season      String?
+  episodes    VideoEpisode[]
+}
+
+model Video {
+  contentId   String  @id
+  content     Content @relation(fields: [contentId], references: [id])
+  duration    Int?
+  episodes    VideoEpisode[]
+}
+
+model VideoEpisode {
+  id          String   @id @default(uuid())
+  animeId     String?
+  anime       Anime?   @relation(fields: [animeId], references: [contentId])
+  videoId     String?
+  video       Video?   @relation(fields: [videoId], references: [contentId])
+  episodeNum  Int
+  title       String?
+  description String?
+  thumbnailUrl String?
+  duration    Int?
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  sources     VideoSource[]
+  watchHistory WatchHistory[]
+}
+
+model VideoSource {
+  id          String   @id @default(uuid())
+  episodeId   String?
+  episode     VideoEpisode? @relation(fields: [episodeId], references: [id])
+  quality     String   // 360p, 480p, 720p, 1080p, 2K, 4K
+  url         String
+  manifestUrl String?
+  bitrate     Int?
+  codec       String?
+  createdAt   DateTime @default(now())
+}
+
+model Story {
+  contentId   String  @id
+  content     Content @relation(fields: [contentId], references: [id])
+  author      String?
+  chapters    StoryChapter[]
+}
+
+model StoryChapter {
+  id          String   @id @default(uuid())
+  storyId     String
+  story       Story    @relation(fields: [storyId], references: [contentId])
+  chapterNum  Float
+  title       String?
+  content     String   @db.Text
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  readHistory ReadHistory[]
+}
+
+model Manga {
+  contentId   String  @id
+  content     Content @relation(fields: [contentId], references: [id])
+  author      String?
+  artist      String?
+  chapters    MangaChapter[]
+}
+
+model MangaChapter {
+  id          String   @id @default(uuid())
+  mangaId     String
+  manga       Manga    @relation(fields: [mangaId], references: [contentId])
+  chapterNum  Float
+  title       String?
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  pages       MangaPage[]
+  readHistory ReadHistory[]
+}
+
+model MangaPage {
+  id          String   @id @default(uuid())
+  chapterId   String
+  chapter     MangaChapter @relation(fields: [chapterId], references: [id])
+  pageNum     Int
+  imageUrl    String
+  width       Int?
+  height      Int?
+}
+
+model Genre {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  contents    ContentGenre[]
+}
+
+model ContentGenre {
+  contentId String
+  genreId   String
+  content   Content @relation(fields: [contentId], references: [id])
+  genre     Genre   @relation(fields: [genreId], references: [id])
+
+  @@id([contentId, genreId])
+}
+
+model Tag {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  contents    ContentTag[]
+}
+
+model ContentTag {
+  contentId String
+  tagId     String
+  content   Content @relation(fields: [contentId], references: [id])
+  tag       Tag     @relation(fields: [tagId], references: [id])
+
+  @@id([contentId, tagId])
+}
+
+model Country {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  contents    Content[]
+}
+
+model Person {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  avatarUrl   String?
+  contents    ContentPerson[]
+}
+
+model ContentPerson {
+  contentId String
+  personId  String
+  role      String   // director, actor, author, etc.
+  content   Content @relation(fields: [contentId], references: [id])
+  person    Person  @relation(fields: [personId], references: [id])
+
+  @@id([contentId, personId, role])
+}
+
+model Studio {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  contents    ContentStudio[]
+}
+
+model ContentStudio {
+  contentId String
+  studioId  String
+  content   Content @relation(fields: [contentId], references: [id])
+  studio    Studio  @relation(fields: [studioId], references: [id])
+
+  @@id([contentId, studioId])
+}
+
+model Comment {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  contentId   String
+  content     Content  @relation(fields: [contentId], references: [id])
+  parentId    String?
+  parent      Comment? @relation("CommentReplies", fields: [parentId], references: [id])
+  replies     Comment[] @relation("CommentReplies")
+  text        String
+  isHidden    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  reports     Report[]
+
+  @@index([contentId])
+  @@index([userId])
+}
+
+model Rating {
+  userId      String
+  contentId   String
+  score       Int      // 1 to 5 or 1 to 10
+  user        User     @relation(fields: [userId], references: [id])
+  content     Content  @relation(fields: [contentId], references: [id])
+
+  @@id([userId, contentId])
+}
+
+model Like {
+  userId      String
+  contentId   String
+  user        User     @relation(fields: [userId], references: [id])
+  content     Content  @relation(fields: [contentId], references: [id])
+
+  @@id([userId, contentId])
+}
+
+model Favorite {
+  userId      String
+  contentId   String
+  user        User     @relation(fields: [userId], references: [id])
+  content     Content  @relation(fields: [contentId], references: [id])
+
+  @@id([userId, contentId])
+}
+
+model Follow {
+  userId      String
+  contentId   String
+  user        User     @relation(fields: [userId], references: [id])
+  content     Content  @relation(fields: [contentId], references: [id])
+
+  @@id([userId, contentId])
+}
+
+model WatchHistory {
+  userId      String
+  episodeId   String
+  progress    Int      // in seconds
+  user        User     @relation(fields: [userId], references: [id])
+  episode     VideoEpisode @relation(fields: [episodeId], references: [id])
+  updatedAt   DateTime @updatedAt
+
+  @@id([userId, episodeId])
+}
+
+model ReadHistory {
+  id          String   @id @default(uuid())
+  userId      String
+  storyChapterId String?
+  mangaChapterId String?
+  user        User     @relation(fields: [userId], references: [id])
+  storyChapter StoryChapter? @relation(fields: [storyChapterId], references: [id])
+  mangaChapter MangaChapter? @relation(fields: [mangaChapterId], references: [id])
+  pageNum     Int?
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, storyChapterId, mangaChapterId])
+}
+
+model View {
+  id          String   @id @default(uuid())
+  contentId   String
+  content     Content  @relation(fields: [contentId], references: [id])
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([contentId])
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  title       String
+  message     String
+  type        String
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Report {
+  id          String   @id @default(uuid())
+  userId      String?
+  contentId   String?
+  commentId   String?
+  type        String   // error, spam, inappropriate, etc.
+  description String
+  status      String   @default("PENDING") // PENDING, RESOLVED, DISMISSED
+  createdAt   DateTime @default(now())
+  
+  comment     Comment? @relation(fields: [commentId], references: [id])
+}
+
+model Banner {
+  id          String   @id @default(uuid())
+  title       String
+  subtitle    String?
+  imageUrl    String
+  linkUrl     String?
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+}
+
+model Setting {
+  key         String   @id
+  value       String
+  description String?
+}
+
+model ViewEvent {
+  id          String   @id @default(uuid())
+  contentId   String
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([contentId])
+  @@index([createdAt])
+}
+
+model BandwidthLog {
+  id          String   @id @default(uuid())
+  episodeId   String?
+  bytesServed BigInt
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([episodeId])
+  @@index([createdAt])
+}
+
+model SearchLog {
+  id          String   @id @default(uuid())
+  query       String
+  userId      String?
+  resultCount Int
+  createdAt   DateTime @default(now())
+
+  @@index([query])
+  @@index([createdAt])
+}

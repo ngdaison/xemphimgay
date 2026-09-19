@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+.next/
+out/
+coverage/
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# Tool caches
+.turbo/
+.swc/
+.eslintcache
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Runtime media/storage generated locally
+media/
+storage/

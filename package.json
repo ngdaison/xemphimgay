@@ -1,0 +1,27 @@
+{
+  "name": "webtruyenphim",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.33.2",
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "dev:api": "pnpm --filter api dev",
+    "dev:worker": "pnpm --filter worker dev",
+    "dev:web": "pnpm --filter web dev",
+    "build": "turbo run build",
+    "build:api": "pnpm --filter api build",
+    "build:worker": "pnpm --filter worker build",
+    "build:web": "pnpm --filter web build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "db:generate": "pnpm --filter @webtruyenphim/database db:generate",
+    "db:push": "pnpm --filter @webtruyenphim/database db:push",
+    "db:seed": "pnpm --filter @webtruyenphim/database db:seed"
+  },
+  "devDependencies": {
+    "turbo": "latest",
+    "prettier": "^3.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.0.0"
+  }
+}
